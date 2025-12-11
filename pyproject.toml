@@ -1,0 +1,34 @@
+[project]
+name = "noise-floor-reporter"
+version = "0.1.0"
+description = "Python scripts to calculate and report on the noise floor of an SDR across multiple bands over time"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "pyrtlsdr>=0.2.93",
+    "paho-mqtt>=1.6.1",
+]
+
+[project.scripts]
+noise-floor-reporter = "noise_floor_reporter.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.7.0",
+    "ruff>=0.0.285",
+]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

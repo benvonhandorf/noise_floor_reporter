@@ -1,0 +1,27 @@
+{
+  "backend": "rtlsdr",
+  "device": 0,
+  "gain": "auto",
+  "sample_rate": 2400000,
+  "num_samples": 262144,
+  "freq": [
+    "3.5-4.0",
+    "7.0-7.3",
+    "10.1-10.15",
+    "14.0-14.35",
+    "18.068-18.168",
+    "21.0-21.45",
+    "24.89-24.99",
+    "28.0-29.7"
+  ],
+  "dwell": 1.0,
+  "output_dir": "data",
+  "json": true,
+  "csv": true,
+  "mqtt_broker": null,
+  "mqtt_port": 1883,
+  "mqtt_topic": "sdr/noise_floor",
+  "mqtt_username": null,
+  "mqtt_password": null,
+  "verbose": false
+}
