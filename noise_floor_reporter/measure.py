@@ -2,122 +2,18 @@
 
 import numpy as np
 from datetime import datetime
-from typing import Optional, Dict, List, Protocol
+from typing import Optional, Dict, List
 import logging
 
+from noise_floor_reporter.backends import (
+    SDRBackend,
+    RTLSDRBackend,
+    HackRFBackend,
+    SDRPlayBackend,
+    SoapySDRBackend,
+)
+
 logger = logging.getLogger(__name__)
-
-
-class SDRBackend(Protocol):
-    """Protocol defining the interface for SDR backends."""
-
-    def set_sample_rate(self, rate: float) -> None:
-        """Set the sample rate."""
-        ...
-
-    def set_center_frequency(self, freq: float) -> None:
-        """Set the center frequency."""
-        ...
-
-    def set_gain(self, gain: str | float) -> None:
-        """Set the gain."""
-        ...
-
-    def read_samples(self, num_samples: int) -> np.ndarray:
-        """Read samples from the SDR."""
-        ...
-
-    def close(self) -> None:
-        """Close the SDR device."""
-        ...
-
-
-class RTLSDRBackend:
-    """RTL-SDR backend implementation."""
-
-    def __init__(self, device_index: int = 0):
-        from rtlsdr import RtlSdr
-
-        self.sdr = RtlSdr(device_index)
-        logger.info(f"Initialized RTL-SDR device {device_index}")
-
-    def set_sample_rate(self, rate: float) -> None:
-        self.sdr.sample_rate = rate
-
-    def set_center_frequency(self, freq: float) -> None:
-        self.sdr.center_freq = freq
-
-    def set_gain(self, gain: str | float) -> None:
-        self.sdr.gain = gain
-
-    def read_samples(self, num_samples: int) -> np.ndarray:
-        return self.sdr.read_samples(num_samples)
-
-    def close(self) -> None:
-        self.sdr.close()
-
-
-class HackRFBackend:
-    """HackRF backend implementation."""
-
-    def __init__(self, device_index: int = 0):
-        import hackrf
-
-        self.sdr = hackrf.HackRF()
-        self._sample_rate = 2.4e6
-        self._center_freq = 100e6
-        logger.info(f"Initialized HackRF device {device_index}")
-
-    def set_sample_rate(self, rate: float) -> None:
-        self._sample_rate = rate
-        self.sdr.sample_rate = rate
-
-    def set_center_frequency(self, freq: float) -> None:
-        self._center_freq = freq
-        self.sdr.center_freq = freq
-
-    def set_gain(self, gain: str | float) -> None:
-        if isinstance(gain, str) and gain == "auto":
-            gain = 20  # Default gain
-        self.sdr.lna_gain = int(gain)
-
-    def read_samples(self, num_samples: int) -> np.ndarray:
-        return self.sdr.read_samples(num_samples)
-
-    def close(self) -> None:
-        self.sdr.close()
-
-
-class SDRPlayBackend:
-    """SDRPlay backend implementation."""
-
-    def __init__(self, device_index: int = 0):
-        try:
-            import sdrplay
-
-            self.sdr = sdrplay.SDRPlay()
-            logger.info(f"Initialized SDRPlay device {device_index}")
-        except ImportError:
-            raise ImportError("SDRPlay library not available")
-
-    def set_sample_rate(self, rate: float) -> None:
-        self.sdr.sample_rate = rate
-
-    def set_center_frequency(self, freq: float) -> None:
-        self.sdr.center_freq = freq
-
-    def set_gain(self, gain: str | float) -> None:
-        if isinstance(gain, str) and gain == "auto":
-            self.sdr.agc_enabled = True
-        else:
-            self.sdr.agc_enabled = False
-            self.sdr.if_gain = int(gain)
-
-    def read_samples(self, num_samples: int) -> np.ndarray:
-        return self.sdr.read_samples(num_samples)
-
-    def close(self) -> None:
-        self.sdr.close()
 
 
 class NoiseFloorMeasurement:
@@ -127,6 +23,7 @@ class NoiseFloorMeasurement:
         "rtlsdr": RTLSDRBackend,
         "hackrf": HackRFBackend,
         "sdrplay": SDRPlayBackend,
+        "soapysdr": SoapySDRBackend,
     }
 
     def __init__(self, sample_rate: int = 2.4e6, num_samples: int = 256 * 1024):
@@ -141,14 +38,20 @@ class NoiseFloorMeasurement:
         self.sdr: Optional[SDRBackend] = None
 
     def initialize_sdr(
-        self, backend: str = "rtlsdr", device_index: int = 0, gain: str | float = "auto"
+        self,
+        backend: str = "rtlsdr",
+        device_index: int = 0,
+        gain: str | float = "auto",
+        device_args: Optional[str] = None,
     ) -> None:
         """Initialize the SDR device with specified backend.
 
         Args:
-            backend: SDR backend to use ('rtlsdr', 'hackrf', 'sdrplay')
+            backend: SDR backend to use ('rtlsdr', 'hackrf', 'sdrplay', 'soapysdr')
             device_index: Index of the SDR device
             gain: Gain setting ('auto' or specific value)
+            device_args: SoapySDR device arguments string (only for soapysdr backend)
+                        Example: "driver=remote,remote=192.168.1.100"
         """
         if backend not in self.BACKENDS:
             raise ValueError(
@@ -157,7 +60,13 @@ class NoiseFloorMeasurement:
 
         try:
             backend_class = self.BACKENDS[backend]
-            self.sdr = backend_class(device_index)
+
+            # SoapySDR backend supports device_args
+            if backend == "soapysdr":
+                self.sdr = backend_class(device_index, device_args)
+            else:
+                self.sdr = backend_class(device_index)
+
             self.sdr.set_sample_rate(self.sample_rate)
             self.sdr.set_gain(gain)
             logger.info(f"Initialized {backend} device {device_index}")

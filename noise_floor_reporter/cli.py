@@ -106,11 +106,15 @@ def main() -> int:
     # SDR configuration
     parser.add_argument(
         "--backend",
-        choices=["rtlsdr", "hackrf", "sdrplay"],
+        choices=["rtlsdr", "hackrf", "sdrplay", "soapysdr"],
         default="rtlsdr",
         help="SDR backend to use",
     )
     parser.add_argument("--device", type=int, default=0, help="SDR device index")
+    parser.add_argument(
+        "--device-args",
+        help="SoapySDR device arguments (e.g., 'driver=remote,remote=192.168.1.100')",
+    )
     parser.add_argument(
         "--gain", default="auto", help="SDR gain setting (auto or numeric value)"
     )
@@ -190,7 +194,12 @@ def main() -> int:
         except (ValueError, TypeError):
             gain = args.gain
 
-        measurement.initialize_sdr(backend=args.backend, device_index=args.device, gain=gain)
+        # Get device_args if provided
+        device_args = getattr(args, "device_args", None)
+
+        measurement.initialize_sdr(
+            backend=args.backend, device_index=args.device, gain=gain, device_args=device_args
+        )
 
         # Perform measurements
         logger.info("Starting measurements...")
